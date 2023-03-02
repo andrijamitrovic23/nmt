@@ -114,6 +114,40 @@ func Test_namespacedTreeHasher_HashNode(t *testing.T) {
 	}
 }
 
+func Test_IgnoreMaxNamespace_HashNode(t *testing.T) {
+	sum(crypto.SHA256, []byte{NodePrefix}, []byte{0, 0, 0, 0}, []byte{1, 1, 1, 1})
+	type children struct {
+		l []byte
+		r []byte
+	}
+
+	tests := []struct {
+		name     string
+		nidLen   namespace.IDSize
+		children children
+		want     []byte
+	}{
+		// test case where ignore max namespace can lead to ignoring the rightMin as max id  even if it is
+		{
+			"leftmax<rightMin && rightMin<rightmax && rightmax==precomputedMaxNs", 1,
+			children{[]byte{7, 8}, []byte{9, 0xF}},
+			append(
+				[]byte{7, 9},
+				sum(crypto.SHA256, []byte{NodePrefix}, []byte{7, 8}, []byte{9, 0xF})...,
+			),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			n := NewNmtHasher(sha256.New(), tt.nidLen, true)
+			if got := n.HashNode(tt.children.l, tt.children.r); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("HashNode() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func sum(hash crypto.Hash, data ...[]byte) []byte {
 	h := hash.New()
 	for _, d := range data {
